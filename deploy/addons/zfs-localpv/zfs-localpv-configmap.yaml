@@ -1,0 +1,20 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: openebs-zfspv-bin
+  namespace: openebs
+  labels:
+    app: openebs-zfs-node
+data:
+  zfs: |
+    #!/bin/sh
+    # Wrapper script to execute ZFS commands on the host via chroot
+    # This ensures we use the host's ZFS userspace tools which match
+    # the kernel module version
+    if [ -x /host/sbin/zfs ]; then
+      chroot /host /sbin/zfs "$@"
+    elif [ -x /host/usr/sbin/zfs ]; then
+      chroot /host /usr/sbin/zfs "$@"
+    else
+      chroot /host zfs "$@"
+    fi

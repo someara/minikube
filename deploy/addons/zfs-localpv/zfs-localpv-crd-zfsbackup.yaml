@@ -1,0 +1,53 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: zfsbackups.zfs.openebs.io
+spec:
+  group: zfs.openebs.io
+  names:
+    kind: ZFSBackup
+    listKind: ZFSBackupList
+    plural: zfsbackups
+    shortNames:
+      - zfsbackup
+      - zb
+    singular: zfsbackup
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                backupDest:
+                  type: string
+                ownerNodeID:
+                  type: string
+                prevSnapName:
+                  type: string
+                snapName:
+                  type: string
+                volumeName:
+                  type: string
+            status:
+              type: object
+              properties:
+                state:
+                  type: string
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Node
+          type: string
+          jsonPath: .spec.ownerNodeID
+        - name: Status
+          type: string
+          jsonPath: .status.state
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

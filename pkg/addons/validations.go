@@ -29,6 +29,7 @@ import (
 	"k8s.io/minikube/pkg/minikube/driver"
 	"k8s.io/minikube/pkg/minikube/out"
 	"k8s.io/minikube/pkg/minikube/run"
+	"k8s.io/minikube/pkg/minikube/style"
 )
 
 const volumesnapshotsAddon = "volumesnapshots"
@@ -84,6 +85,46 @@ func isKVMDriverForNVIDIA(cc *config.ClusterConfig, name, _ string, _ *run.Comma
 	out.Ln("")
 	out.FailureT("The {{.addon}} addon is only supported with the KVM driver.\n\nFor GPU setup instructions see: https://minikube.sigs.k8s.io/docs/tutorials/nvidia/", out.V{"addon": name})
 	return fmt.Errorf("%s addon is only supported with the KVM driver", name)
+}
+
+// isAarch64 is a validator that ensures the addon is only enabled on aarch64 architecture
+func isAarch64(cc *config.ClusterConfig, name, _ string, _ *run.CommandOptions) error {
+	if cc.KubernetesConfig.ImageRepository == "" {
+		// Check the node's architecture
+		for _, node := range cc.Nodes {
+			if node.KubernetesVersion != "" {
+				// We don't have direct access to arch here, so we check via the cluster config
+				break
+			}
+		}
+	}
+	// The ZFS addon requires aarch64 architecture (ARM64)
+	// This is because the ZFS-enabled ISO is only built for aarch64
+	// TODO: When x86_64 ZFS ISO is available, remove this restriction
+	out.Ln("")
+	out.WarningT("The {{.addon}} addon is currently only supported on aarch64 (ARM64) architecture.", out.V{"addon": name})
+	out.WarningT("Ensure you are running on an aarch64 system with a ZFS-enabled ISO.")
+	return nil
+}
+
+// enableVolumesnapshotsIfNeeded auto-enables the volumesnapshots addon when zfs-localpv is enabled
+func enableVolumesnapshotsIfNeeded(cc *config.ClusterConfig, _, value string, options *run.CommandOptions) error {
+	isZfsEnabled, _ := strconv.ParseBool(value)
+	if !isZfsEnabled {
+		return nil
+	}
+	// Check if volumesnapshots is already enabled
+	addonList := viper.GetStringSlice(config.AddonListFlag)
+	isVolumesnapshotsEnabled := assets.Addons[volumesnapshotsAddon].IsEnabled(cc) || slices.Contains(addonList, volumesnapshotsAddon)
+	if !isVolumesnapshotsEnabled {
+		out.Ln("")
+		out.Styled(style.AddonEnable, "Auto-enabling 'volumesnapshots' addon for ZFS snapshot support...")
+		// Enable volumesnapshots addon
+		if err := EnableOrDisableAddon(cc, volumesnapshotsAddon, "true", options); err != nil {
+			return fmt.Errorf("failed to auto-enable volumesnapshots addon: %w", err)
+		}
+	}
+	return nil
 }
 
 // isAddonValid returns the addon, true if it is valid

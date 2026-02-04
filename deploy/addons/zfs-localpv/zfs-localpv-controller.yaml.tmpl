@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openebs-zfs-controller
+  namespace: openebs
+  labels:
+    app: openebs-zfs-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openebs-zfs-controller
+  template:
+    metadata:
+      labels:
+        app: openebs-zfs-controller
+    spec:
+      serviceAccountName: openebs-zfs-controller-sa
+      containers:
+        - name: csi-provisioner
+          image: {{.CustomRegistries.CSIProvisioner}}{{.ImageRepository}}{{.Images.CSIProvisioner}}
+          args:
+            - "--csi-address=$(CSI_ENDPOINT)"
+            - "--feature-gates=Topology=true"
+            - "--strict-topology"
+            - "--immediate-topology=false"
+            - "--timeout=60s"
+            - "--leader-election"
+            - "--leader-election-namespace=openebs"
+            - "--extra-create-metadata=true"
+            - "--enable-capacity=true"
+            - "--default-fstype=zfs"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-resizer
+          image: {{.CustomRegistries.CSIResizer}}{{.ImageRepository}}{{.Images.CSIResizer}}
+          args:
+            - "--csi-address=$(CSI_ENDPOINT)"
+            - "--timeout=60s"
+            - "--leader-election"
+            - "--leader-election-namespace=openebs"
+            - "--handle-volume-inuse-error=false"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-snapshotter
+          image: {{.CustomRegistries.CSISnapshotter}}{{.ImageRepository}}{{.Images.CSISnapshotter}}
+          args:
+            - "--csi-address=$(CSI_ENDPOINT)"
+            - "--timeout=60s"
+            - "--leader-election"
+            - "--leader-election-namespace=openebs"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: snapshot-controller
+          image: {{.CustomRegistries.SnapshotController}}{{.ImageRepository}}{{.Images.SnapshotController}}
+          args:
+            - "--leader-election"
+            - "--leader-election-namespace=openebs"
+        - name: openebs-zfs-plugin
+          image: {{.CustomRegistries.ZFSDriver}}{{.Images.ZFSDriver}}
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--nodeid=$(OPENEBS_NODE_ID)"
+            - "--plugin=controller"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: OPENEBS_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: OPENEBS_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+      volumes:
+        - name: socket-dir
+          emptyDir: {}

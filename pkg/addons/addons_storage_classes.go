@@ -29,6 +29,18 @@ import (
 
 const defaultStorageClassProvisioner = "standard"
 
+// storageClassForAddon returns the storage class name for a given addon
+func storageClassForAddon(name string) string {
+	switch name {
+	case "storage-provisioner-rancher":
+		return "local-path"
+	case "zfs-localpv":
+		return "openebs-zfspv"
+	default:
+		return defaultStorageClassProvisioner
+	}
+}
+
 // enableOrDisableStorageClasses enables or disables storage classes
 func enableOrDisableStorageClasses(cc *config.ClusterConfig, name string, val string, options *run.CommandOptions) error {
 	klog.Infof("enableOrDisableStorageClasses %s=%v on %q", name, val, cc.Name)
@@ -37,10 +49,7 @@ func enableOrDisableStorageClasses(cc *config.ClusterConfig, name string, val st
 		return fmt.Errorf("Error parsing boolean: %w", err)
 	}
 
-	class := defaultStorageClassProvisioner
-	if name == "storage-provisioner-rancher" {
-		class = "local-path"
-	}
+	class := storageClassForAddon(name)
 
 	api, err := machine.NewAPIClient(options)
 	if err != nil {

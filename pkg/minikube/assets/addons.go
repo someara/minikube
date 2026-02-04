@@ -793,6 +793,35 @@ var Addons = map[string]*Addon{
 		map[string]string{
 			"Kubetail": "docker.io",
 		}, nil),
+	"zfs-localpv": NewAddon([]*BinAsset{
+		MustBinAsset(addons.ZfsLocalpvAssets, "zfs-localpv/zfs-localpv-crd-zfsvolume.yaml", vmpath.GuestAddonsDir, "zfs-localpv-crd-zfsvolume.yaml", "0640"),
+		MustBinAsset(addons.ZfsLocalpvAssets, "zfs-localpv/zfs-localpv-crd-zfssnapshot.yaml", vmpath.GuestAddonsDir, "zfs-localpv-crd-zfssnapshot.yaml", "0640"),
+		MustBinAsset(addons.ZfsLocalpvAssets, "zfs-localpv/zfs-localpv-crd-zfsrestore.yaml", vmpath.GuestAddonsDir, "zfs-localpv-crd-zfsrestore.yaml", "0640"),
+		MustBinAsset(addons.ZfsLocalpvAssets, "zfs-localpv/zfs-localpv-crd-zfsbackup.yaml", vmpath.GuestAddonsDir, "zfs-localpv-crd-zfsbackup.yaml", "0640"),
+		MustBinAsset(addons.ZfsLocalpvAssets, "zfs-localpv/zfs-localpv-rbac.yaml", vmpath.GuestAddonsDir, "zfs-localpv-rbac.yaml", "0640"),
+		MustBinAsset(addons.ZfsLocalpvAssets, "zfs-localpv/zfs-localpv-configmap.yaml", vmpath.GuestAddonsDir, "zfs-localpv-configmap.yaml", "0640"),
+		MustBinAsset(addons.ZfsLocalpvAssets, "zfs-localpv/zfs-localpv-driver.yaml", vmpath.GuestAddonsDir, "zfs-localpv-driver.yaml", "0640"),
+		MustBinAsset(addons.ZfsLocalpvAssets, "zfs-localpv/zfs-localpv-controller.yaml.tmpl", vmpath.GuestAddonsDir, "zfs-localpv-controller.yaml", "0640"),
+		MustBinAsset(addons.ZfsLocalpvAssets, "zfs-localpv/zfs-localpv-node.yaml.tmpl", vmpath.GuestAddonsDir, "zfs-localpv-node.yaml", "0640"),
+		MustBinAsset(addons.ZfsLocalpvAssets, "zfs-localpv/zfs-localpv-storageclass.yaml", vmpath.GuestAddonsDir, "zfs-localpv-storageclass.yaml", "0640"),
+		MustBinAsset(addons.ZfsLocalpvAssets, "zfs-localpv/zfs-localpv-snapshotclass.yaml", vmpath.GuestAddonsDir, "zfs-localpv-snapshotclass.yaml", "0640"),
+	}, false, "zfs-localpv", "3rd party (OpenEBS)", "", "https://github.com/openebs/zfs-localpv",
+		map[string]string{
+			"ZFSDriver":           "openebs/zfs-driver:2.6.2@sha256:c2c777c4a6b5b8c6c5d60d1e88f65c0c83ab1ca94e74892fe23fd12124372498",
+			"CSIProvisioner":      "sig-storage/csi-provisioner:v5.2.0@sha256:abe168a0d0c9bfc0c2f85998ecd3c35ddb4f2000c27d8c1b9e588c899b89c2c6",
+			"CSIResizer":          "sig-storage/csi-resizer:v1.13.2@sha256:ed28feff6db32b74be534c49e28bb3bab49f5765c99972f1e2e1ff2ec8fe3de6",
+			"CSISnapshotter":      "sig-storage/csi-snapshotter:v8.2.0@sha256:9de76b39ea4b6b4438b04ca74c9e1bdb9a68f1bb0cba8ab4a4fc9efcc7ea3c41",
+			"SnapshotController":  "sig-storage/snapshot-controller:v8.2.0@sha256:6c57020e8e8ac8a7de8ba4cf8f3475eddd3a5e69a97db8767e06de5ba32db7d9",
+			"NodeDriverRegistrar": "sig-storage/csi-node-driver-registrar:v2.13.0@sha256:d7e8a85b9db0a4e0f66f31c6f6c01fd6eac5b57fcc8e6e0034ed1d307665fbb2",
+		},
+		map[string]string{
+			"ZFSDriver":           "docker.io",
+			"CSIProvisioner":      "registry.k8s.io",
+			"CSIResizer":          "registry.k8s.io",
+			"CSISnapshotter":      "registry.k8s.io",
+			"SnapshotController":  "registry.k8s.io",
+			"NodeDriverRegistrar": "registry.k8s.io",
+		}, nil),
 }
 
 // parseMapString creates a map based on `str` which is encoded as <key1>=<value1>,<key2>=<value2>,...

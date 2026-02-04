@@ -1,0 +1,82 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: zfsvolumes.zfs.openebs.io
+spec:
+  group: zfs.openebs.io
+  names:
+    kind: ZFSVolume
+    listKind: ZFSVolumeList
+    plural: zfsvolumes
+    shortNames:
+      - zfsvol
+      - zv
+    singular: zfsvolume
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                capacity:
+                  type: string
+                compression:
+                  type: string
+                dedup:
+                  type: string
+                encryption:
+                  type: string
+                fsType:
+                  type: string
+                keyformat:
+                  type: string
+                keylocation:
+                  type: string
+                ownerNodeID:
+                  type: string
+                poolName:
+                  type: string
+                recordsize:
+                  type: string
+                shared:
+                  type: string
+                snapname:
+                  type: string
+                thinProvision:
+                  type: string
+                volblocksize:
+                  type: string
+                volumeType:
+                  type: string
+            status:
+              type: object
+              properties:
+                state:
+                  type: string
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: ZPool
+          type: string
+          jsonPath: .spec.poolName
+        - name: Node
+          type: string
+          jsonPath: .spec.ownerNodeID
+        - name: Size
+          type: string
+          jsonPath: .spec.capacity
+        - name: Status
+          type: string
+          jsonPath: .status.state
+        - name: Filesystem
+          type: string
+          jsonPath: .spec.fsType
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

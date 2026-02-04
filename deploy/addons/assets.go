@@ -178,4 +178,8 @@ var (
 	// Kubetail assets for kubetail addon
 	//go:embed kubetail/*.yaml kubetail/*.tmpl
 	KubetailAssets embed.FS
+
+	// ZfsLocalpvAssets assets for zfs-localpv addon
+	//go:embed zfs-localpv/*.yaml zfs-localpv/*.tmpl
+	ZfsLocalpvAssets embed.FS
 )

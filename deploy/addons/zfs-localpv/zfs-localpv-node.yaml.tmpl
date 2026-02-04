@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: openebs-zfs-node
+  namespace: openebs
+  labels:
+    app: openebs-zfs-node
+spec:
+  selector:
+    matchLabels:
+      app: openebs-zfs-node
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 100%
+  template:
+    metadata:
+      labels:
+        app: openebs-zfs-node
+    spec:
+      serviceAccountName: openebs-zfs-node-sa
+      hostNetwork: true
+      containers:
+        - name: csi-node-driver-registrar
+          image: {{.CustomRegistries.NodeDriverRegistrar}}{{.ImageRepository}}{{.Images.NodeDriverRegistrar}}
+          args:
+            - "--csi-address=$(CSI_ENDPOINT)"
+            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "rm -rf /registration/zfs.csi.openebs.io /registration/zfs.csi.openebs.io-reg.sock"]
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/zfs.csi.openebs.io/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+        - name: openebs-zfs-plugin
+          image: {{.CustomRegistries.ZFSDriver}}{{.Images.ZFSDriver}}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true
+          args:
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--nodeid=$(OPENEBS_NODE_ID)"
+            - "--plugin=node"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: OPENEBS_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: OPENEBS_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
+            - name: device-dir
+              mountPath: /dev
+            - name: pods-mount-dir
+              mountPath: /var/lib/kubelet/
+              mountPropagation: "Bidirectional"
+            - name: host-root
+              mountPath: /host
+              mountPropagation: "HostToContainer"
+            - name: zfspv-bin
+              mountPath: /usr/local/bin/zfs
+              subPath: zfs
+      volumes:
+        - name: plugin-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/zfs.csi.openebs.io/
+            type: DirectoryOrCreate
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry/
+            type: Directory
+        - name: pods-mount-dir
+          hostPath:
+            path: /var/lib/kubelet/
+            type: Directory
+        - name: device-dir
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
+        - name: zfspv-bin
+          configMap:
+            name: openebs-zfspv-bin
+            defaultMode: 0555

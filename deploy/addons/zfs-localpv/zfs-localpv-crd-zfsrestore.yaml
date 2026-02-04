@@ -1,0 +1,49 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: zfsrestores.zfs.openebs.io
+spec:
+  group: zfs.openebs.io
+  names:
+    kind: ZFSRestore
+    listKind: ZFSRestoreList
+    plural: zfsrestores
+    shortNames:
+      - zfsrestore
+      - zr
+    singular: zfsrestore
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                ownerNodeID:
+                  type: string
+                restoreSrc:
+                  type: string
+                volumeName:
+                  type: string
+            status:
+              type: object
+              properties:
+                state:
+                  type: string
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Node
+          type: string
+          jsonPath: .spec.ownerNodeID
+        - name: Status
+          type: string
+          jsonPath: .status.state
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

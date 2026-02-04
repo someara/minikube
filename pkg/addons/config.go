@@ -246,4 +246,10 @@ var Addons = []*Addon{
 		set:       SetBool,
 		callbacks: []setFn{EnableOrDisableAddon},
 	},
+	{
+		name:        "zfs-localpv",
+		set:         SetBool,
+		validations: []setFn{isAarch64, enableVolumesnapshotsIfNeeded},
+		callbacks:   []setFn{EnableOrDisableAddon, enableOrDisableStorageClasses},
+	},
 }
