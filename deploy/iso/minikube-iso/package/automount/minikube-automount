@@ -2,15 +2,28 @@
 
 set -x
 
-echo "automount ...";
+echo "automount (ZFS) ...";
 LABEL=boot2docker-data
 MAGIC="boot2docker, please format-me"
+POOL_NAME="minikube"
 
-# If there is a partition with `boot2docker-data` as its label, use it and be
-# very happy. Thus, you can come along if you feel like a room without a roof.
-BOOT2DOCKER_DATA=`blkid -o device -l -t LABEL=$LABEL`
+# Load ZFS module
+modprobe zfs || true
+
+# Check if ZFS pool already exists and is imported
+if zpool list "$POOL_NAME" &>/dev/null; then
+    echo "ZFS pool $POOL_NAME already imported"
+    BOOT2DOCKER_DATA="zfs"
+else
+    # Try to import existing pool
+    if zpool import -N "$POOL_NAME" &>/dev/null; then
+        echo "Imported existing ZFS pool $POOL_NAME"
+        BOOT2DOCKER_DATA="zfs"
+    fi
+fi
+
 DISKS="$(lsblk | grep disk | cut -f1 -d' ')"
-echo $BOOT2DOCKER_DATA
+
 for DISK in $DISKS; do
     if [ -n "$BOOT2DOCKER_DATA" ]; then
         # The primary minikube disk has been found or provisioned; stop provisioning other disks
@@ -18,7 +31,7 @@ for DISK in $DISKS; do
     fi
 
     UNPARTITIONED_HD="/dev/$DISK"
-    echo "Is the disk unpartitioned?, test for the 'boot2docker format-me' string"
+    echo "Checking disk $UNPARTITIONED_HD for provisioning..."
 
     # Is the disk unpartitioned?, test for the 'boot2docker format-me' string
     parted --script "$UNPARTITIONED_HD" print | grep "Partition Table: unknown"
@@ -31,7 +44,7 @@ for DISK in $DISKS; do
             # save the preload userdata.tar file
             dd if=$UNPARTITIONED_HD of=/userdata.tar bs=1 count=4096 2>/dev/null
             # Create the partition, format it and then mount it
-            echo "NEW boot2docker managed disk image ($UNPARTITIONED_HD): formatting it for use"
+            echo "NEW boot2docker managed disk image ($UNPARTITIONED_HD): formatting with ZFS"
             # Let kernel re-read partition table
             partprobe
             # Add the data partition
@@ -42,8 +55,18 @@ for DISK in $DISKS; do
             timer=0
             while [ "$timer" -lt 10 ]; do
                 if [ -b "${UNPARTITIONED_HD}1" ]; then
-                    BOOT2DOCKER_DATA=`echo "${UNPARTITIONED_HD}1"`
-                    mkfs.ext4 -i 2048 -L $LABEL $BOOT2DOCKER_DATA && break
+                    BOOT2DOCKER_DATA="${UNPARTITIONED_HD}1"
+                    # Create ZFS pool on the partition
+                    zpool create -f -o ashift=12 \
+                        -O acltype=posixacl \
+                        -O compression=lz4 \
+                        -O dnodesize=auto \
+                        -O normalization=formD \
+                        -O relatime=on \
+                        -O xattr=sa \
+                        -O canmount=off \
+                        -O mountpoint=none \
+                        "$POOL_NAME" "${UNPARTITIONED_HD}1" && break
                 fi
                 echo "Waiting for ${UNPARTITIONED_HD}1 to exist."
                 timer=$((timer + 1))
@@ -51,7 +74,7 @@ for DISK in $DISKS; do
             done
         fi
 
-        DISK_VENDOR=$(cat /sys/class/block/$(basename $UNPARTITIONED_HD /dev/)/device/vendor /sys/class/block/$(basename $UNPARTITIONED_HD /dev/)/device/model | tr -d "\n")
+        DISK_VENDOR=$(cat /sys/class/block/$(basename $UNPARTITIONED_HD /dev/)/device/vendor /sys/class/block/$(basename $UNPARTITIONED_HD /dev/)/device/model 2>/dev/null | tr -d "\n")
         # Test if disk is "VMware, VMware Virtual S" and empty.
         if [ "$DISK_VENDOR" = "VMware, VMware Virtual S" ] || [ "$DISK_VENDOR" = "VMware  Virtual disk    " ]; then
             # Check whether the disk has any known partitions on it
@@ -62,10 +85,20 @@ for DISK in $DISKS; do
                 NON_NUL=$(<device_test_file tr -d '\0\n' | wc -c)
                 if [ $NON_NUL == 0 ]; then
                     # Create the partition, format it and then mount it
-                    echo "NEW VMware boot2docker managed disk image ($UNPARTITIONED_HD): formatting it for use"
+                    echo "NEW VMware boot2docker managed disk image ($UNPARTITIONED_HD): formatting with ZFS"
                     (echo g; echo n; echo 1; echo ; echo ; echo w) | fdisk $UNPARTITIONED_HD
-                    BOOT2DOCKER_DATA=`echo "${UNPARTITIONED_HD}1"`
-                    mkfs.ext4 -i 2048 -L $LABEL $BOOT2DOCKER_DATA
+                    BOOT2DOCKER_DATA="${UNPARTITIONED_HD}1"
+                    # Create ZFS pool on the partition
+                    zpool create -f -o ashift=12 \
+                        -O acltype=posixacl \
+                        -O compression=lz4 \
+                        -O dnodesize=auto \
+                        -O normalization=formD \
+                        -O relatime=on \
+                        -O xattr=sa \
+                        -O canmount=off \
+                        -O mountpoint=none \
+                        "$POOL_NAME" "${UNPARTITIONED_HD}1"
                 else
                     echo "Disk ($UNPARTITIONED_HD) unpartitioned but something is there... not doing anything"
                 fi
@@ -74,15 +107,76 @@ for DISK in $DISKS; do
             fi
         fi
     else
-        # Pick the first ext4 as a fallback
-        # TODO: mount all Linux partitions and look for a /var/lib/docker...
-        BOOT2DOCKER_DATA=`blkid | grep -e 'TYPE="btrfs"'  -e 'TYPE="ext4"' | head -n 1 | sed 's/:.*//'`
+        # Try to import pool from this disk's partitions
+        for part in ${UNPARTITIONED_HD}*[0-9]; do
+            if [ -b "$part" ]; then
+                if zpool import -d "$part" -N "$POOL_NAME" &>/dev/null; then
+                    echo "Imported ZFS pool from $part"
+                    BOOT2DOCKER_DATA="zfs"
+                    break 2
+                fi
+            fi
+        done
     fi
 done
 
-echo $BOOT2DOCKER_DATA
+echo "BOOT2DOCKER_DATA=$BOOT2DOCKER_DATA"
 
-if [ -n "$BOOT2DOCKER_DATA" ]; then
+# If we have a ZFS pool, create datasets and mount them
+if zpool list "$POOL_NAME" &>/dev/null; then
+    echo "Setting up ZFS datasets on pool $POOL_NAME"
+    
+    # Create datasets if they don't exist
+    create_dataset() {
+        local dataset="$1"
+        local mountpoint="$2"
+        if ! zfs list "$POOL_NAME/$dataset" &>/dev/null; then
+            zfs create -o mountpoint="$mountpoint" "$POOL_NAME/$dataset"
+        else
+            # Ensure mountpoint is set correctly
+            zfs set mountpoint="$mountpoint" "$POOL_NAME/$dataset"
+        fi
+    }
+
+    # Create all required datasets
+    create_dataset "boot2docker" "/var/lib/boot2docker"
+    create_dataset "docker" "/var/lib/docker"
+    create_dataset "containerd" "/var/lib/containerd"
+    create_dataset "buildkit" "/var/lib/buildkit"
+    create_dataset "containers" "/var/lib/containers"
+    create_dataset "log" "/var/log"
+    create_dataset "tmp" "/var/tmp"
+    create_dataset "kubelet" "/var/lib/kubelet"
+    create_dataset "cni" "/var/lib/cni"
+    create_dataset "data" "/data"
+    create_dataset "hostpath_pv" "/tmp/hostpath_pv"
+    create_dataset "hostpath-provisioner" "/tmp/hostpath-provisioner"
+    create_dataset "minikube" "/var/lib/minikube"
+    create_dataset "toolbox" "/var/lib/toolbox"
+    create_dataset "minishift" "/var/lib/minishift"
+
+    # Mount all datasets
+    zfs mount -a
+
+    # Handle userdata.tar
+    if [ -e "/userdata.tar" ]; then
+        mv /userdata.tar /var/lib/boot2docker/
+    fi
+
+    if [ -e "/var/lib/boot2docker/userdata.tar" ]; then
+        tar xf /var/lib/boot2docker/userdata.tar -C /home/docker/
+        chown -R docker:docker /home/docker/.ssh
+        rm -f '/home/docker/boot2docker, please format-me'
+    fi
+
+    ## make an env file for other services to discover this pool easier
+    mkdir -p /var/run/minikube
+    echo "ZFS_POOL=\"$POOL_NAME\"" > /var/run/minikube/env
+    echo "PERSISTENT_DIR=\"zfs\"" >> /var/run/minikube/env
+
+elif [ -n "$BOOT2DOCKER_DATA" ] && [ "$BOOT2DOCKER_DATA" != "zfs" ]; then
+    # Fallback to ext4/btrfs mount (legacy support)
+    echo "Falling back to traditional filesystem mount for $BOOT2DOCKER_DATA"
     PARTNAME=`echo "$BOOT2DOCKER_DATA" | sed 's/.*\///'`
     echo "mount p:$PARTNAME ..."
     mkdir -p /mnt/$PARTNAME
