@@ -13,7 +13,7 @@ ExecStartPre=/sbin/modprobe overlay
 ExecStart=/usr/bin/containerd \
       $CONTAINERD_OPTIONS \
       $CONTAINERD_MINIKUBE_OPTIONS \
-      --root ${PERSISTENT_DIR}/var/lib/containerd
+      --root ${PERSISTENT_DIR:-}/var/lib/containerd
 TasksMax=8192
 # ref: https://github.com/containerd/containerd/blob/main/docs/ops.md#systemd
 Delegate=yes

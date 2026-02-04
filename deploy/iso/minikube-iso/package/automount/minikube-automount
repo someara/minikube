@@ -7,8 +7,31 @@ LABEL=boot2docker-data
 MAGIC="boot2docker, please format-me"
 POOL_NAME="minikube"
 
-# Load ZFS module
-modprobe zfs || true
+# Load ZFS module with diagnostics
+ZFS_AVAILABLE=false
+echo "=== ZFS Initialization ==="
+echo "Attempting to load ZFS kernel module..."
+
+if modprobe zfs 2>&1; then
+    echo "ZFS kernel module loaded successfully"
+    if command -v zpool >/dev/null 2>&1 && command -v zfs >/dev/null 2>&1; then
+        ZFS_AVAILABLE=true
+        echo "ZFS userspace tools found: $(which zpool) $(which zfs)"
+        echo "ZFS module version: $(cat /sys/module/zfs/version 2>/dev/null || echo 'unknown')"
+    else
+        echo "ERROR: ZFS module loaded but userspace tools not found"
+        echo "  zpool: $(which zpool 2>&1 || echo 'NOT FOUND')"
+        echo "  zfs: $(which zfs 2>&1 || echo 'NOT FOUND')"
+    fi
+else
+    echo "ERROR: Failed to load ZFS kernel module"
+    echo "  Checking for module files: ls -la /lib/modules/$(uname -r)/extra/zfs/ 2>&1"
+    ls -la /lib/modules/$(uname -r)/extra/zfs/ 2>&1 || echo "  ZFS module directory not found"
+    echo "  dmesg | tail -20:"
+    dmesg | tail -20 || true
+fi
+echo "ZFS_AVAILABLE=$ZFS_AVAILABLE"
+echo "==========================="
 
 # Check if ZFS pool already exists and is imported
 if zpool list "$POOL_NAME" &>/dev/null; then
@@ -142,6 +165,8 @@ if zpool list "$POOL_NAME" &>/dev/null; then
     create_dataset "boot2docker" "/var/lib/boot2docker"
     create_dataset "docker" "/var/lib/docker"
     create_dataset "containerd" "/var/lib/containerd"
+    # Create dataset for containerd ZFS snapshotter (required mount point)
+    create_dataset "containerd/snapshotter" "/var/lib/containerd/io.containerd.snapshotter.v1.zfs"
     create_dataset "buildkit" "/var/lib/buildkit"
     create_dataset "containers" "/var/lib/containers"
     create_dataset "log" "/var/log"
@@ -172,7 +197,16 @@ if zpool list "$POOL_NAME" &>/dev/null; then
     ## make an env file for other services to discover this pool easier
     mkdir -p /var/run/minikube
     echo "ZFS_POOL=\"$POOL_NAME\"" > /var/run/minikube/env
-    echo "PERSISTENT_DIR=\"zfs\"" >> /var/run/minikube/env
+    # Empty PERSISTENT_DIR since ZFS datasets mount directly at their mountpoints
+    echo "PERSISTENT_DIR=\"\"" >> /var/run/minikube/env
+
+    # Configure containerd to use ZFS snapshotter
+    CONTAINERD_CONFIG="/etc/containerd/config.toml"
+    if [ -f "$CONTAINERD_CONFIG" ]; then
+        echo "Configuring containerd to use ZFS snapshotter"
+        sed -i 's/snapshotter = "overlayfs"/snapshotter = "zfs"/' "$CONTAINERD_CONFIG"
+        echo "CONTAINERD_SNAPSHOTTER=\"zfs\"" >> /var/run/minikube/env
+    fi
 
 elif [ -n "$BOOT2DOCKER_DATA" ] && [ "$BOOT2DOCKER_DATA" != "zfs" ]; then
     # Fallback to ext4/btrfs mount (legacy support)
@@ -264,6 +298,8 @@ elif [ -n "$BOOT2DOCKER_DATA" ] && [ "$BOOT2DOCKER_DATA" != "zfs" ]; then
     ## make an env file for other services to discover this PARTNAME easier
     mkdir -p /var/run/minikube
     echo "PERSISTENT_DIR=\"/mnt/$PARTNAME\"" > /var/run/minikube/env
+    # Use overlayfs snapshotter for legacy storage
+    echo "CONTAINERD_SNAPSHOTTER=\"overlayfs\"" >> /var/run/minikube/env
 fi
 
 # /etc dirs are initialised from /usr/local, to allow the user/admin to customise

@@ -1,10 +1,16 @@
 [Unit]
 Description=minikube automount
 Requires=systemd-udev-settle.service
-Before=docker.service
-After=systemd-udev-settle.service
+Before=docker.service containerd.service
+After=systemd-udev-settle.service zfs-import-cache.service zfs-import-scan.service
+Wants=zfs-import-cache.service zfs-import-scan.service
 
 [Service]
 ExecStart=/usr/sbin/minikube-automount
 Type=oneshot
 RemainAfterExit=true
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target
