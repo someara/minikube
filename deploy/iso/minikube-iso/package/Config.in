@@ -4,4 +4,5 @@ menu "System tools"
     source "$BR2_EXTERNAL_MINIKUBE_PATH/package/automount/Config.in"
     source "$BR2_EXTERNAL_MINIKUBE_PATH/package/scheduled-stop/Config.in"
     source "$BR2_EXTERNAL_MINIKUBE_PATH/package/runc-master/Config.in"
+    source "$BR2_EXTERNAL_MINIKUBE_PATH/package/zfs/Config.in"
 endmenu
