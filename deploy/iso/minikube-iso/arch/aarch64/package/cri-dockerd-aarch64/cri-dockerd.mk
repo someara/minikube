@@ -18,8 +18,9 @@ CRI_DOCKERD_AARCH64_ENV = \
 	GOPATH="$(CRI_DOCKERD_AARCH64_GOPATH)" \
 	PATH=$(CRI_DOCKERD_AARCH64_GOPATH)/bin:$(BR_PATH) \
 	GOARCH=arm64 \
-	GOPROXY="https://proxy.golang.org,direct" \
-	GOSUMDB='sum.golang.org'\
+	GOPROXY="http://athens.athens.svc.cluster.local:80,direct" \
+	GONOSUMDB='*' \
+	GONOSUMCHECK='*' \
 	GOOS=linux
 
 CRI_DOCKERD_AARCH64_COMPILE_SRC = $(CRI_DOCKERD_AARCH64_GOPATH)/src/github.com/Mirantis/cri-dockerd
