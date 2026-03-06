@@ -1,5 +1,5 @@
-config BR2_PACKAGE_ZFS
-	bool "zfs"
+config BR2_PACKAGE_ZFS_USER
+	bool "zfs-user"
 	default y
 	depends on BR2_TOOLCHAIN_HAS_THREADS
 	depends on BR2_USE_MMU
@@ -13,5 +13,8 @@ config BR2_PACKAGE_ZFS
 	  ZFS userspace utilities (zpool, zfs, zed).
 	  The kernel module is built-in (CONFIG_ZFS=y), so only
 	  userspace tools are needed.
+
+	  Named zfs-user to avoid collision with Buildroot's upstream
+	  zfs package (which requires BR2_LINUX_KERNEL=y).
 
 	  https://github.com/openzfs/zfs
