@@ -18,6 +18,13 @@ set -e
 
 GENIMAGE_CFG="$2"
 
+# Verify kernel Image exists (pre-built kernel placed by workflow)
+if [ ! -f "$BINARIES_DIR/Image" ]; then
+  echo "ERROR: Kernel Image not found at $BINARIES_DIR/Image"
+  echo "The kernel must be pre-built and placed in the images directory."
+  exit 1
+fi
+
 support/scripts/genimage.sh -c "$GENIMAGE_CFG"
 
 cd "$BINARIES_DIR"
