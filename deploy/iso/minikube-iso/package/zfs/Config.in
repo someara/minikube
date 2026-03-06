@@ -1,0 +1,17 @@
+config BR2_PACKAGE_ZFS
+	bool "zfs"
+	default y
+	depends on BR2_TOOLCHAIN_HAS_THREADS
+	depends on BR2_USE_MMU
+	select BR2_PACKAGE_UTIL_LINUX
+	select BR2_PACKAGE_UTIL_LINUX_LIBUUID
+	select BR2_PACKAGE_UTIL_LINUX_LIBBLKID
+	select BR2_PACKAGE_ZLIB
+	select BR2_PACKAGE_LIBTIRPC
+	select BR2_PACKAGE_OPENSSL
+	help
+	  ZFS userspace utilities (zpool, zfs, zed).
+	  The kernel module is built-in (CONFIG_ZFS=y), so only
+	  userspace tools are needed.
+
+	  https://github.com/openzfs/zfs

@@ -7,28 +7,20 @@ LABEL=boot2docker-data
 MAGIC="boot2docker, please format-me"
 POOL_NAME="minikube"
 
-# Load ZFS module with diagnostics
+# ZFS is compiled directly into the kernel (CONFIG_ZFS=y) with loadable
+# modules disabled (CONFIG_MODULES=n). No modprobe needed.
 ZFS_AVAILABLE=false
 echo "=== ZFS Initialization ==="
-echo "Attempting to load ZFS kernel module..."
+echo "ZFS is built-in to the kernel (CONFIG_ZFS=y, CONFIG_MODULES=n)"
 
-if modprobe zfs 2>&1; then
-    echo "ZFS kernel module loaded successfully"
-    if command -v zpool >/dev/null 2>&1 && command -v zfs >/dev/null 2>&1; then
-        ZFS_AVAILABLE=true
-        echo "ZFS userspace tools found: $(which zpool) $(which zfs)"
-        echo "ZFS module version: $(cat /sys/module/zfs/version 2>/dev/null || echo 'unknown')"
-    else
-        echo "ERROR: ZFS module loaded but userspace tools not found"
-        echo "  zpool: $(which zpool 2>&1 || echo 'NOT FOUND')"
-        echo "  zfs: $(which zfs 2>&1 || echo 'NOT FOUND')"
-    fi
+if command -v zpool >/dev/null 2>&1 && command -v zfs >/dev/null 2>&1; then
+    ZFS_AVAILABLE=true
+    echo "ZFS userspace tools found: $(which zpool) $(which zfs)"
+    echo "ZFS version: $(cat /sys/module/zfs/version 2>/dev/null || echo 'built-in')"
 else
-    echo "ERROR: Failed to load ZFS kernel module"
-    echo "  Checking for module files: ls -la /lib/modules/$(uname -r)/extra/zfs/ 2>&1"
-    ls -la /lib/modules/$(uname -r)/extra/zfs/ 2>&1 || echo "  ZFS module directory not found"
-    echo "  dmesg | tail -20:"
-    dmesg | tail -20 || true
+    echo "ERROR: ZFS is built into the kernel but userspace tools not found"
+    echo "  zpool: $(which zpool 2>&1 || echo 'NOT FOUND')"
+    echo "  zfs: $(which zfs 2>&1 || echo 'NOT FOUND')"
 fi
 echo "ZFS_AVAILABLE=$ZFS_AVAILABLE"
 echo "==========================="
